@@ -210,3 +210,8 @@ class Pallino {
         this.velocita.limit(this.maxSpeed);
     }
 }
+
+
+        this.velocita.limit(this.maxSpeed);
+    }
+}
