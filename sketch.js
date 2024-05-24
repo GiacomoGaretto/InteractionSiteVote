@@ -4,19 +4,45 @@ let numGrigi = 0;
 let numBlu = 0;
 let numArancioni = 0;
 
-// Inizializza WebSocket
-const ws = new WebSocket('ws://localhost:8080');
+// Inizializza WebSocket una sola volta
+let ws;
 
-// Ricevi messaggi WebSocket
-ws.onmessage = (event) => {
-    const message = event.data;
-    window[message]();
-};
+function initWebSocket() {
+    ws = new WebSocket('ws://localhost:8080');
+    
+    ws.onopen = () => {
+        console.log('WebSocket connection opened');
+    };
+
+    ws.onmessage = (event) => {
+        const message = event.data;
+        if (typeof window[message] === "function") {
+            window[message]();
+        }
+    };
+
+    ws.onclose = () => {
+        console.log('WebSocket connection closed. Reconnecting...');
+        setTimeout(initWebSocket, 1000); // Prova a riconnettersi dopo 1 secondo
+    };
+
+    ws.onerror = (error) => {
+        console.log('WebSocket error:', error);
+    };
+}
+
+initWebSocket(); // Inizializza la connessione WebSocket
 
 // Funzione per inviare messaggi WebSocket
 function sendMessage(action) {
-    ws.send(action);
-    window[action]();
+    if (ws.readyState === WebSocket.OPEN) {
+        ws.send(action);
+    } else {
+        console.log('WebSocket is not open. ReadyState:', ws.readyState);
+    }
+    if (typeof window[action] === "function") {
+        window[action]();
+    }
 }
 
 function setup() {
