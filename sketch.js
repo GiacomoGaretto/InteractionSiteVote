@@ -1,0 +1,219 @@
+const express = require('express');
+const http = require('http');
+const WebSocket = require('ws');
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+app.use(express.static('public'));
+
+wss.on('connection', (ws) => {
+    ws.on('message', (message) => {
+        // Broadcast the message to all clients
+        wss.clients.forEach(client => {
+            if (client !== ws && client.readyState === WebSocket.OPEN) {
+                client.send(message);
+            }
+        });
+    });
+});
+
+server.listen(8080, () => {
+    console.log('Server is listening on port 8080');
+});
+
+
+
+let pallini = [];
+let flockingEnabled = false;
+let numGrigi = 0;
+let numBlu = 0;
+let numArancioni = 0;
+
+
+function setup() {
+    let canvasContainer = document.getElementById('canvas-container');
+    let canvas = createCanvas(canvasContainer.offsetWidth, canvasContainer.offsetHeight);
+    canvas.parent('canvas-container');
+    noStroke();
+    window.addEventListener('resize', resizeCanvasToContainer);
+    document.addEventListener('keydown', keyPressed);
+}
+
+function draw() {
+    background(255);
+
+    fill(0);
+    textSize(10);
+    textAlign(LEFT, TOP);
+    text(`Pallini totali: ${pallini.length}`, 10, 10);
+    text(`Grigi: ${numGrigi}`, 10, 20);
+    text(`Blu: ${numBlu}`, 10, 30);
+    text(`Arancioni: ${numArancioni}`, 10, 40);
+
+    for (let p of pallini) {
+        if (flockingEnabled) {
+            p.flock(pallini);
+        }
+        p.update();
+        p.display();
+    }
+}
+
+function resizeCanvasToContainer() {
+    let canvasContainer = document.getElementById('canvas-container');
+    resizeCanvas(canvasContainer.offsetWidth, canvasContainer.offsetHeight);
+}
+
+function addPallini() {
+    for (let i = 0; i < 10; i++) {
+        let newColore = color(217);
+        numGrigi++;
+        let newPallino = new Pallino(random(width), random(height), newColore);
+        pallini.push(newPallino);
+    }
+}
+
+function toggleFlocking() {
+    flockingEnabled = !flockingEnabled;
+}
+
+function selectBlu() {
+    let selectedPallino = selectPallino(color(217));
+    if (selectedPallino != null) {
+        numGrigi--;
+        numBlu++;
+        selectedPallino.setColor(color(0, 148, 255));
+    }
+}
+
+function selectArancione() {
+    let selectedPallino = selectPallino(color(217));
+    if (selectedPallino != null) {
+        numGrigi--;
+        numArancioni++;
+        selectedPallino.setColor(color(255, 156, 40));
+    }
+}
+
+function removeBlu() {
+    pallini = pallini.filter(p => p.getColor().toString() !== color(0, 148, 255).toString());
+    numBlu = 0;
+}
+
+function removeArancione() {
+    pallini = pallini.filter(p => p.getColor().toString() !== color(255, 156, 40).toString());
+    numArancioni = 0;
+}
+
+function resetCanvas() {
+    pallini = [];
+    numGrigi = 0;
+    numBlu = 0;
+    numArancioni = 0;
+}
+
+function selectPallino(col) {
+    for (let p of pallini) {
+        if (p.getColor().toString() === col.toString()) {
+            return p;
+        }
+    }
+    return null;
+}
+
+function keyPressed(event) {
+    // Se il tasto premuto è il tasto Enter (codice 13)
+    if (event.keyCode === 13) {
+        // Esegui l'azione desiderata, ad esempio fare clic sul pulsante "Aggiungi Grigio"
+        addPallini();
+    }
+    // Se il tasto premuto è il tasto B (codice 66)
+    else if (event.keyCode === 66) {
+        // Esegui l'azione desiderata, ad esempio fare clic sul pulsante "Aggiungi Blu"
+        selectBlu();
+    }
+    // Se il tasto premuto è il tasto A (codice 65)
+    else if (event.keyCode === 65) {
+        // Esegui l'azione desiderata, ad esempio fare clic sul pulsante "Aggiungi Arancione"
+        selectArancione();
+    }
+}
+
+class Pallino {
+    constructor(x, y, colore) {
+        this.x = x;
+        this.y = y;
+        this.velocita = createVector(random(-3, 3), random(-3, 3));
+        this.colore = colore;
+        this.diametro = (colore.toString() === color(217).toString()) ? 7 : 9.6; // Imposta il diametro in base al colore
+        this.maxSpeed = 5;
+    }
+
+    update() {
+        this.x += this.velocita.x;
+        this.y += this.velocita.y;
+
+        // Rimbalzo sui bordi
+        if (this.x - this.diametro / 2 < 0 || this.x + this.diametro / 2 > width) {
+            this.velocita.x *= -1;
+        }
+        if (this.y - this.diametro / 2 < 0 || this.y + this.diametro / 2 > height) {
+            this.velocita.y *= -1;
+        }
+    }
+
+    display() {
+        fill(this.colore);
+        ellipse(this.x, this.y, this.diametro, this.diametro);
+    }
+
+    setColor(c) {
+        this.colore = c;
+        // Aggiorna il diametro quando viene cambiato il colore
+        this.diametro = (this.colore.toString() === color(217).toString()) ? 7 : 9.6;
+    }
+
+    getColor() {
+        return this.colore;
+    }
+
+    flock(pallini) {
+        // Skip flocking for gray dots
+        if (this.colore.toString() === color(217).toString()) {
+            return;
+        }
+
+        let targetX = this.colore.toString() === color(0, 148, 255).toString() ? width / 4 : 3 * width / 4;
+        let targetY = height / 2;
+
+        // Calcoliamo la direzione verso cui il pallino è attratto
+        let attractionDirection = this.x < width / 2 ? 1 : -1;
+
+        // Calcoliamo la forza di attrazione verso il target
+        let attrazione = createVector(targetX - this.x, targetY - this.y);
+        attrazione.setMag(0.1); // Modifica la forza di attrazione
+
+        // Applichiamo la forza di attrazione
+        this.velocita.add(attrazione);
+
+        // Check if the pallino is in the attraction half of the screen
+        if ((attractionDirection > 0 && this.x < width / 2) || (attractionDirection < 0 && this.x > width / 2)) {
+            // Separation: Evita le sovrapposizioni con altri pallini
+            for (let other of pallini) {
+                if (other !== this && (other.getColor().toString() === color(0, 148, 255).toString() || other.getColor().toString() === color(255, 156, 40).toString())) {
+                    let d = dist(this.x, this.y, other.x, other.y);
+                    if (d < 20) {
+                        let separation = createVector(this.x - other.x, this.y - other.y);
+                        separation.setMag(0.1); // Modifica la forza di separazione
+                        this.velocita.add(separation);
+                    }
+                }
+            }
+        }
+
+        // Limitiamo la velocità massima
+        this.velocita.limit(this.maxSpeed);
+    }
+}
