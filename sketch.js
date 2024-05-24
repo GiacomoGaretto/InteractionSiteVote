@@ -1,36 +1,23 @@
-const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
-
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-
-app.use(express.static('public'));
-
-wss.on('connection', (ws) => {
-    ws.on('message', (message) => {
-        // Broadcast the message to all clients
-        wss.clients.forEach(client => {
-            if (client !== ws && client.readyState === WebSocket.OPEN) {
-                client.send(message);
-            }
-        });
-    });
-});
-
-server.listen(8080, () => {
-    console.log('Server is listening on port 8080');
-});
-
-
-
 let pallini = [];
 let flockingEnabled = false;
 let numGrigi = 0;
 let numBlu = 0;
 let numArancioni = 0;
 
+// Inizializza WebSocket
+const ws = new WebSocket('ws://localhost:8080');
+
+// Ricevi messaggi WebSocket
+ws.onmessage = (event) => {
+    const message = event.data;
+    window[message]();
+};
+
+// Funzione per inviare messaggi WebSocket
+function sendMessage(action) {
+    ws.send(action);
+    window[action]();
+}
 
 function setup() {
     let canvasContainer = document.getElementById('canvas-container');
@@ -124,20 +111,12 @@ function selectPallino(col) {
 }
 
 function keyPressed(event) {
-    // Se il tasto premuto è il tasto Enter (codice 13)
     if (event.keyCode === 13) {
-        // Esegui l'azione desiderata, ad esempio fare clic sul pulsante "Aggiungi Grigio"
-        addPallini();
-    }
-    // Se il tasto premuto è il tasto B (codice 66)
-    else if (event.keyCode === 66) {
-        // Esegui l'azione desiderata, ad esempio fare clic sul pulsante "Aggiungi Blu"
-        selectBlu();
-    }
-    // Se il tasto premuto è il tasto A (codice 65)
-    else if (event.keyCode === 65) {
-        // Esegui l'azione desiderata, ad esempio fare clic sul pulsante "Aggiungi Arancione"
-        selectArancione();
+        sendMessage('addPallini');
+    } else if (event.keyCode === 66) {
+        sendMessage('selectBlu');
+    } else if (event.keyCode === 65) {
+        sendMessage('selectArancione');
     }
 }
 
@@ -147,7 +126,7 @@ class Pallino {
         this.y = y;
         this.velocita = createVector(random(-3, 3), random(-3, 3));
         this.colore = colore;
-        this.diametro = (colore.toString() === color(217).toString()) ? 7 : 9.6; // Imposta il diametro in base al colore
+        this.diametro = (colore.toString() === color(217).toString()) ? 7 : 9.6;
         this.maxSpeed = 5;
     }
 
@@ -155,7 +134,6 @@ class Pallino {
         this.x += this.velocita.x;
         this.y += this.velocita.y;
 
-        // Rimbalzo sui bordi
         if (this.x - this.diametro / 2 < 0 || this.x + this.diametro / 2 > width) {
             this.velocita.x *= -1;
         }
@@ -171,7 +149,6 @@ class Pallino {
 
     setColor(c) {
         this.colore = c;
-        // Aggiorna il diametro quando viene cambiato il colore
         this.diametro = (this.colore.toString() === color(217).toString()) ? 7 : 9.6;
     }
 
@@ -180,40 +157,30 @@ class Pallino {
     }
 
     flock(pallini) {
-        // Skip flocking for gray dots
         if (this.colore.toString() === color(217).toString()) {
             return;
         }
 
         let targetX = this.colore.toString() === color(0, 148, 255).toString() ? width / 4 : 3 * width / 4;
         let targetY = height / 2;
-
-        // Calcoliamo la direzione verso cui il pallino è attratto
         let attractionDirection = this.x < width / 2 ? 1 : -1;
-
-        // Calcoliamo la forza di attrazione verso il target
         let attrazione = createVector(targetX - this.x, targetY - this.y);
-        attrazione.setMag(0.1); // Modifica la forza di attrazione
-
-        // Applichiamo la forza di attrazione
+        attrazione.setMag(0.1);
         this.velocita.add(attrazione);
 
-        // Check if the pallino is in the attraction half of the screen
         if ((attractionDirection > 0 && this.x < width / 2) || (attractionDirection < 0 && this.x > width / 2)) {
-            // Separation: Evita le sovrapposizioni con altri pallini
             for (let other of pallini) {
                 if (other !== this && (other.getColor().toString() === color(0, 148, 255).toString() || other.getColor().toString() === color(255, 156, 40).toString())) {
                     let d = dist(this.x, this.y, other.x, other.y);
                     if (d < 20) {
                         let separation = createVector(this.x - other.x, this.y - other.y);
-                        separation.setMag(0.1); // Modifica la forza di separazione
+                        separation.setMag(0.1);
                         this.velocita.add(separation);
                     }
                 }
             }
         }
 
-        // Limitiamo la velocità massima
         this.velocita.limit(this.maxSpeed);
     }
 }
