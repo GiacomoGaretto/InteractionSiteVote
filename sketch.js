@@ -8,7 +8,7 @@ let animatingPallini = [];
 const animationDuration = 1500; // 1.5 seconds
 const targetAreaSize = 200; // 20px x 20px area
 
-const ws = new WebSocket('ws://voting-WS.glitch.me');
+const ws = new WebSocket('https://glitch.com/~voting-ws');
 
 ws.onopen = function() {
     console.log('Connected to the server');
