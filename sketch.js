@@ -12,7 +12,7 @@ const serverAddress = 'wss://connessione-ws-voting.glitch.me/';
 
 const ws = new WebSocket(serverAddress, {
     headers: {
-        "user-agent": "Mozilla"
+        "user-agent": "Google Chrome"
     }
 });
 
