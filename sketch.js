@@ -10,11 +10,7 @@ const targetAreaSize = 200; // 20px x 20px area
 
 const serverAddress = 'wss://connessione-ws-voting.glitch.me/';
 
-const ws = new WebSocket(serverAddress, {
-    headers: {
-        "user-agent": "Google Chrome"
-    }
-});
+const ws = new WebSocket(serverAddress);
 
 ws.onopen = function() {
     console.log('Connected to the server');
